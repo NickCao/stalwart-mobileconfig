@@ -1,0 +1,14 @@
+{
+  "protocols": {
+    "imap": {"host": "imap.example.com"},
+    "smtp": {"host": "smtp.example.com"},
+    "caldav": {"url": "https://dav.example.com/calendars/"},
+    "carddav": {"url": "https://dav.example.com/contacts/"},
+    "jmap": {"url": "https://mail.example.com/jmap/session"}
+  },
+  "authentication": {
+    "oauth-public": {"issuer": "https://id.example.com"},
+    "password": true
+  },
+  "info": {"provider": {"name": "Example & Friends"}}
+}
