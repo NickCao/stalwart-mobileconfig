@@ -21,12 +21,16 @@ def main(argv: list[str] | None = None) -> None:
         "--name", help="Display name for outgoing mail (defaults to the email address)"
     )
     parser.add_argument(
+        "--password",
+        help="Embed this password for IMAP, SMTP and CalDAV (defaults to prompting on the device)",
+    )
+    parser.add_argument(
         "-o", "--output", type=Path, help="Write a .mobileconfig file instead of stdout"
     )
     args = parser.parse_args(argv)
     try:
         email = email_address(args.email)
-        profile = make_profile(email, discover(email), args.name)
+        profile = make_profile(email, discover(email), args.name, args.password)
         data = plistlib.dumps(profile, fmt=plistlib.FMT_XML, sort_keys=False)
         if args.output is None:
             sys.stdout.buffer.write(data)

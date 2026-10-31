@@ -13,7 +13,12 @@ def object_field(parent: dict, name: str) -> dict:
     return value
 
 
-def make_profile(email: str, document: dict, name: str | None = None) -> dict:
+def make_profile(
+    email: str,
+    document: dict,
+    name: str | None = None,
+    password: str | None = None,
+) -> dict:
     email = email_address(email)
     protocols = object_field(document, "protocols")
     imap = object_field(protocols, "imap")
@@ -88,6 +93,11 @@ def make_profile(email: str, document: dict, name: str | None = None) -> dict:
         CalDAVUseSSL=True,
         CalDAVUsername=email,
     )
+    if password is not None:
+        mail["IncomingPassword"] = password
+        mail["OutgoingPassword"] = password
+        calendar["CalDAVPassword"] = password
+
     return {
         "PayloadType": "Configuration",
         "PayloadVersion": 1,

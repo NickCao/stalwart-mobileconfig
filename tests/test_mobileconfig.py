@@ -195,6 +195,30 @@ class CliTests(unittest.TestCase):
         self.assertEqual(profile["PayloadContent"][0]["EmailAccountName"], "Alice")
         discover.assert_called_once_with("alice@example.com")
 
+    @patch("stalwart_mobileconfig.cli.discover")
+    def test_command_embeds_the_exact_password_for_all_services(self, discover):
+        discover.return_value = json.loads(FIXTURE.read_bytes())
+        for password in (' leading & <"password">\t', ""):
+            with (
+                self.subTest(password=password),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                path = Path(directory) / "alice.mobileconfig"
+                main(
+                    [
+                        "alice@example.com",
+                        "--password",
+                        password,
+                        "-o",
+                        str(path),
+                    ]
+                )
+                profile = plistlib.loads(path.read_bytes())
+            mail, calendar = profile["PayloadContent"]
+            self.assertEqual(mail["IncomingPassword"], password)
+            self.assertEqual(mail["OutgoingPassword"], password)
+            self.assertEqual(calendar["CalDAVPassword"], password)
+
     @patch(
         "stalwart_mobileconfig.cli.discover", side_effect=URLError("connection failed")
     )

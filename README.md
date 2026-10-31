@@ -26,18 +26,29 @@ Optionally supply a display name for outgoing mail:
 uv run stalwart-mobileconfig nickcao@nichi.co --name 'Nick Cao' > nickcao.mobileconfig
 ```
 
+Optionally embed a password for IMAP, SMTP and CalDAV:
+
+```sh
+uv run stalwart-mobileconfig nickcao@nichi.co --password 'your-app-password' -o nickcao.mobileconfig
+```
+
+The password is stored as plain text in the generated XML. It can also appear in
+your shell history and process arguments when supplied this way. Omitting
+`--password` keeps passwords out of the profile.
+
 ## Installing the profile
 
 Open the file on your Mac, iPhone or iPad and install it through the profile
-installation UI. It is unsigned and contains no passwords. During manual
-installation Apple prompts for the password; Mail reuses its incoming password
-for SMTP, and Calendar may prompt separately. No server addresses or usernames
-need to be entered on the device.
+installation UI. It is unsigned. If `--password` was omitted, Apple prompts for
+the password during manual installation; Mail reuses its incoming password for
+SMTP, and Calendar may prompt separately. No server addresses or usernames need
+to be entered on the device.
 
 For a Keycloak-backed Stalwart account, sign in to the Stalwart WebUI and create
-an app password under Account > Credentials > App Passwords. Enter that app
-password when the device prompts. This profile configures password
-authentication; it does not configure an OAuth/CIMD browser login flow.
+an app password under Account > Credentials > App Passwords. Supply that app
+password with `--password` or enter it when the device prompts. This profile
+configures password authentication; it does not configure an OAuth/CIMD browser
+login flow.
 
 Profile identifiers and UUIDs are stable for each email address, so regenerating
 a profile retains its identity. The generator requires IMAP, SMTP and CalDAV
