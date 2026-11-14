@@ -13,7 +13,7 @@ These were the latest published releases when checked.
 | Keycloak sign-in contract | Reviewed CIMD registration, authorization-code/PKCE, discovery, scope assignment, resource-indicator enforcement, and audience mapper behavior. The app sends the same resource in authorization and token requests. The installation must allow the requested scopes and resource. |
 | PACC and profile payload | Hostnames, SMTP naming, TLS ports, CalDAV URL, and password-authentication advertisement match Stalwart's response. Profiles generated from that response compare equal to the Python generator, including UUIDs and embedded credentials. |
 | Credential lifecycle | Signing in creates no password. Generation and repeated downloads create one per workflow. Real credential authentication succeeds over IMAP, SMTP, and CalDAV; creating another credential with that password is forbidden. Lost-response handling and duplicate prevention also have fixture-based failure tests. |
-| Release metadata | The manifest, OAuth document, npm package, Python package, and uv lock agree on 0.1.3. The workflow checks all five against the release tag. |
+| Release metadata | The manifest, OAuth document, npm package, Python package, and uv lock agree on 0.1.4. The workflow checks all five against the release tag. |
 
 The session capability check was the integration mismatch found in the reviewed
 paths. Earlier test fixtures repeated the same incorrect assumption, which

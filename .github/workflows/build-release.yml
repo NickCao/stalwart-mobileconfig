@@ -98,6 +98,8 @@ jobs:
           echo "e1d9538748730b103279542b91cd4d7723eb4106687a51a167c9507a48072aa8  $RUNNER_TEMP/stalwart-integration/stalwart.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/stalwart-integration/stalwart.tar.gz" \
             -C "$RUNNER_TEMP/stalwart-integration" stalwart
+          # The upstream archive stores the binary without execute permissions.
+          chmod 0755 "$RUNNER_TEMP/stalwart-integration/stalwart"
           python tests/stalwart_smoke.py --stalwart "$RUNNER_TEMP/stalwart-integration/stalwart"
 
       - name: Upload application bundle

@@ -42,7 +42,7 @@ https://github.com/NickCao/stalwart-mobileconfig/releases/latest/download/stalwa
 ```
 
 Use that URL as `resourceUrl`, or replace `latest/download` with
-`download/v0.1.3` to select a specific release.
+`download/v0.1.4` to select a specific release.
 The application manager's resource URL points to the bundle; users
 visit the app served by Stalwart, such as `https://mail.example.com/apple-setup/`.
 An installation prefix other than `/apple-setup` works too.
@@ -345,8 +345,8 @@ For a release of the current version:
 
 ```sh
 git push origin master
-git tag -a v0.1.3 -m "Release v0.1.3"
-git push origin v0.1.3
+git tag -a v0.1.4 -m "Release v0.1.4"
+git push origin v0.1.4
 ```
 
 For later releases, update `version` in `web/stalwart-app.json`, `package.json`,
