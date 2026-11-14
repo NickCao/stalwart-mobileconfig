@@ -6,7 +6,6 @@
   "token_endpoint_auth_method": "none",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
-  "scope": "openid",
   "software_id": "io.github.nickcao.stalwart-mobileconfig",
-  "software_version": "0.1.0"
+  "software_version": "0.1.1"
 }

@@ -21,7 +21,7 @@ FIXTURE = json.loads((ROOT / "tests/fixtures/ua-auto-config.json").read_text())
 SECRET = ' generated & <"device-secret">\t'
 
 
-def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response=False, expired_session=False):
+def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response=False, expired_session=False, rejected_signin=False, extra_scopes=()):
     context = browser.new_context(
         viewport={"width": 390, "height": 844} if mobile else {"width": 1280, "height": 900},
         accept_downloads=True,
@@ -53,13 +53,14 @@ def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response
                 "code_challenge_methods_supported": ["S256"],
                 "client_id_metadata_document_supported": True,
                 "authorization_response_iss_parameter_supported": True,
-                "scopes_supported": ["openid"],
+                "scopes_supported": ["openid", "profile", "email", "stalwart"],
             })
         elif request.url.startswith(f"{ISSUER}/auth?"):
             params = parse_qs(url.query)
             assert params["client_id"] == [f"{ORIGIN}{prefix}oauth-client.json"]
             assert params["redirect_uri"] == [f"{ORIGIN}{prefix}index.html"]
             assert params["code_challenge_method"] == ["S256"]
+            assert params["scope"] == [" ".join(["openid", "profile", "email", *extra_scopes])]
             requests["authorization"] = params
             callback = params["redirect_uri"][0] + "?" + urlencode({
                 "code": "fixture-authorization-code",
@@ -87,6 +88,9 @@ def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response
             fulfill_json(route, FIXTURE)
         elif path == "/jmap/session":
             assert request.headers["authorization"] == "Bearer fixture-access-token"
+            if rejected_signin:
+                route.fulfill(status=401, body="fixture rejected token")
+                return
             fulfill_json(route, {
                 "capabilities": {
                     "urn:ietf:params:jmap:core": {},
@@ -130,6 +134,8 @@ def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response
             if name == "index.html":
                 # Emulate the application manager's installation-prefix rewrite.
                 body = body.replace(b'<base href="/"', f'<base href="{prefix}"'.encode())
+                body = body.replace(b'<meta name="oauth-scopes" content=""',
+                                    f'<meta name="oauth-scopes" content="{" ".join(extra_scopes)}"'.encode())
             route.fulfill(content_type=mimetypes.guess_type(file)[0] or "text/plain", body=body)
         else:
             raise AssertionError(f"Unexpected request: {request.url}")
@@ -138,9 +144,19 @@ def run_scenario(browser, *, prefix="/apple-setup/", mobile=False, lost_response
     page.goto(f"{ORIGIN}{prefix}")
     expect(page.get_by_role("button", name="Sign in to continue")).to_be_visible()
     assert requests["creations"] == 0
-    if not mobile and not lost_response and not expired_session:
+    if not mobile and not lost_response and not expired_session and not rejected_signin:
         page.screenshot(path=str(ROOT / "dist/preview-desktop.png"), full_page=True)
     page.get_by_role("button", name="Sign in to continue").click()
+    if rejected_signin:
+        expect(page.get_by_role("alert")).to_contain_text("Stalwart did not accept this sign-in")
+        expect(page.get_by_role("alert")).not_to_contain_text("expired")
+        expect(page.get_by_role("button", name="Sign in to continue")).to_be_visible()
+        assert requests["creations"] == 0
+        assert page.evaluate("sessionStorage.length") == 0
+        assert not errors, errors
+        print("PASS browser: rejected initial sign-in")
+        context.close()
+        return
     expect(page.get_by_role("button", name="Download setup profile")).to_be_visible()
     expect(page.locator("#account-email")).to_have_text("alice@example.com")
     expect(page.get_by_label("Name on outgoing mail")).to_have_value("Alice & Friends")
@@ -195,9 +211,10 @@ def main():
     with sync_playwright() as playwright:
         browser = getattr(playwright, args.browser).launch()
         run_scenario(browser)
-        run_scenario(browser, prefix="/connect/", mobile=True)
+        run_scenario(browser, prefix="/connect/", mobile=True, extra_scopes=("stalwart",))
         run_scenario(browser, lost_response=True)
         run_scenario(browser, expired_session=True)
+        run_scenario(browser, rejected_signin=True)
         browser.close()
 
 

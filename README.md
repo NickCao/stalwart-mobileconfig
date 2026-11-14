@@ -64,10 +64,40 @@ needed when Keycloak accepts that document.
 
 The redirect returns to `index.html` inside the installed app. Sign-in uses
 Authorization Code with PKCE/S256, state validation, and issuer validation.
+The app requests `openid`, `profile`, and `email` when the issuer advertises
+them. The latter two scopes let Keycloak include the username, display name,
+and email claims that Stalwart may need to resolve the mailbox.
+
 The requested resource is the Stalwart origin. Stalwart must accept the
-Keycloak token's issuer and audience, as for its other first-party clients.
+Keycloak access token's issuer and audience, as for its other first-party clients.
+With Keycloak's Resource Indicators feature enabled, add that origin to the
+**Resource indicator allow list** of its `client-id-metadata-document` executor.
+Otherwise, configure an audience mapper
+to include the Stalwart resource identifier or an audience explicitly accepted
+by Stalwart's OIDC directory.
+
+If an optional Keycloak client scope supplies that mapper or other required
+claims, add it to this Stalwart Application's `oauthScopes`. For example, for
+a client scope named `stalwart` that you have already configured in Keycloak:
+
+```json
+{
+  "oauthScopes": {"stalwart": true}
+}
+```
+
+Stalwart injects these extra scopes into the app's `oauth-scopes` meta tag;
+the app includes them alongside the identity scopes at sign-in.
 The Keycloak token endpoint must permit browser requests from the Stalwart
 origin; enabling CIMD alone does not replace the realm's trust and CORS policy.
+
+If `/jmap/session` returns 401 immediately after a successful Keycloak sign-in,
+Stalwart rejected the newly issued access token. Check Stalwart's authentication
+log for the validation reason: a missing username claim, an unacceptable
+audience, an issuer/signature error, or an unrecognized client can all prevent
+authentication. Requesting `resource` does not by itself enable Keycloak's
+Resource Indicators feature or configure an audience mapper. Keep audience
+validation enabled, and avoid posting access tokens in bug reports.
 
 ### What the user does
 
@@ -210,7 +240,8 @@ uv run --no-project --with playwright python tests/browser_smoke.py --browser we
 These checks simulate the Stalwart and Keycloak endpoints and download a real
 file in the browser. They cover desktop and mobile layouts, different
 installation prefixes, repeated downloads, a lost creation response, and expired
-sessions in Chromium and WebKit.
+sessions in Chromium and WebKit. They also check rejected initial sign-ins and
+extra OAuth scopes injected by the application manager.
 The screenshots are written to `dist/`.
 
 Live Keycloak/Stalwart integration and installation of a browser-generated file
@@ -229,12 +260,12 @@ release with generated release notes and `stalwart-mobileconfig.zip` attached.
 Publishing uses GitHub's built-in `GITHUB_TOKEN`; no personal access token or
 repository secret is needed.
 
-For the first release, after committing the workflow:
+For a release of the current version:
 
 ```sh
 git push origin master
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "Release v0.1.1"
+git push origin v0.1.1
 ```
 
 For later releases, update `version` in `web/stalwart-app.json`, `package.json`,

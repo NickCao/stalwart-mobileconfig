@@ -18,7 +18,24 @@ export async function codeChallenge(verifier) {
   return base64URL(new Uint8Array(digest));
 }
 
-export async function discoverAuthorization(origin, fetcher = fetch) {
+function applicationScopes() {
+  const content = globalThis.document?.querySelector('meta[name="oauth-scopes"]')?.getAttribute("content") || "";
+  return content.split(/\s+/u).filter(Boolean);
+}
+
+export function signInScopes(metadata, extraScopes = []) {
+  // A successful OAuth login still needs the claims Stalwart uses to resolve
+  // the mailbox. Keycloak puts preferred_username/name in profile and email
+  // in email; openid alone does not request either set of claims.
+  const identityScopes = ["openid", "profile", "email"].filter((scope) =>
+    !Array.isArray(metadata.scopes_supported) || metadata.scopes_supported.includes(scope));
+  const requiredScopes = Array.isArray(metadata.stalwart_required_scopes)
+    ? metadata.stalwart_required_scopes : [];
+  return [...new Set([...identityScopes, ...requiredScopes, ...extraScopes]
+    .filter((scope) => typeof scope === "string" && scope))];
+}
+
+export async function discoverAuthorization(origin, fetcher = fetch, extraScopes = []) {
   const resource = await fetchJSON(`${origin}/.well-known/oauth-protected-resource`, {}, fetcher);
   const issuer = httpsURL(resource.authorization_servers?.[0], "Identity-provider issuer").href.replace(/\/$/u, "");
   const metadata = await fetchJSON(`${issuer}/.well-known/openid-configuration`, {}, fetcher);
@@ -36,16 +53,14 @@ export async function discoverAuthorization(origin, fetcher = fetch) {
     authorizationEndpoint: httpsURL(metadata.authorization_endpoint, "Authorization endpoint").href,
     tokenEndpoint: httpsURL(metadata.token_endpoint, "Token endpoint").href,
     requireIssuer: metadata.authorization_response_iss_parameter_supported === true,
-    scopes: Array.isArray(metadata.stalwart_required_scopes)
-      ? metadata.stalwart_required_scopes.filter((scope) => typeof scope === "string" && scope)
-      : metadata.scopes_supported?.includes("openid") ? ["openid"] : [],
+    scopes: signInScopes(metadata, extraScopes),
     resource: origin,
   };
 }
 
-export async function startSignIn(baseURL, storage = sessionStorage, fetcher = fetch) {
+export async function startSignIn(baseURL, storage = sessionStorage, fetcher = fetch, extraScopes = applicationScopes()) {
   const base = httpsURL(baseURL, "Application URL");
-  const discovery = await discoverAuthorization(base.origin, fetcher);
+  const discovery = await discoverAuthorization(base.origin, fetcher, extraScopes);
   const verifier = randomToken();
   const state = randomToken();
   const clientID = new URL("oauth-client.json", base).href;

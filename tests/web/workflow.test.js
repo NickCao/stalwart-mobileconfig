@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
-  CORE, STALWART, CreationUncertainError, DEVICE_PERMISSIONS,
+  CORE, STALWART, CreationUncertainError, DEVICE_PERMISSIONS, HTTPError,
   createAppPassword, discoverConfiguration, fetchJSON, loadAccount,
 } from "../../web/api.js";
 import { ProfileDownload } from "../../web/workflow.js";
@@ -35,6 +35,20 @@ test("session discovery binds the profile to the authenticated personal account"
   });
   assert.equal(result.accountID, "own-account");
   assert.equal(result.email, "Alice@example.com");
+});
+
+test("a rejected sign-in is distinguished from a later expired session", async () => {
+  await assert.rejects(loadAccount("https://mail.example.com", "newly-issued-token", async (url, options) => {
+    assert.equal(url, "https://mail.example.com/jmap/session");
+    assert.equal(options.headers.Authorization, "Bearer newly-issued-token");
+    return new Response("", { status: 401 });
+  }), (error) => {
+    assert.ok(error instanceof HTTPError);
+    assert.equal(error.status, 401);
+    assert.match(error.message, /Stalwart did not accept this sign-in/u);
+    assert.doesNotMatch(error.message, /expired/u);
+    return true;
+  });
 });
 
 test("a foreign API URL never receives the bearer token", async () => {

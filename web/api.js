@@ -74,9 +74,20 @@ export async function jmapCall(context, method, arguments_, using = [CORE, STALW
 }
 
 export async function loadAccount(origin, accessToken, fetcher = fetch) {
-  const session = await fetchJSON(`${origin}/jmap/session`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }, fetcher);
+  let session;
+  try {
+    session = await fetchJSON(`${origin}/jmap/session`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, fetcher);
+  } catch (error) {
+    if (error instanceof HTTPError && error.status === 401) {
+      throw new HTTPError(
+        "Stalwart did not accept this sign-in. Ask your administrator to check the sign-in settings.",
+        error.status,
+      );
+    }
+    throw error;
+  }
   if (!session.capabilities?.[STALWART]) {
     throw new Error("This server does not expose Stalwart's account-management API.");
   }
