@@ -103,7 +103,10 @@ def run_scenario(
                 fulfill_json(route, {
                     "capabilities": {"urn:ietf:params:jmap:core": {}, "urn:ietf:params:jmap:mail": {}},
                     "primaryAccounts": {"urn:ietf:params:jmap:mail": "own-account"},
-                    "accounts": {"own-account": {"isPersonal": True}},
+                    "accounts": {"own-account": {
+                        "isPersonal": True,
+                        "accountCapabilities": {"urn:ietf:params:jmap:mail": {}},
+                    }},
                     "username": "alice@example.com",
                     "apiUrl": f"{ORIGIN}/jmap/",
                 })
@@ -113,10 +116,16 @@ def run_scenario(
                     "urn:ietf:params:jmap:core": {},
                     "urn:ietf:params:jmap:mail": {},
                     "urn:ietf:params:jmap:submission": {},
-                    "urn:stalwart:jmap": {},
                 },
                 "primaryAccounts": {"urn:stalwart:jmap": "own-account"},
-                "accounts": {"own-account": {"isPersonal": True}},
+                "accounts": {"own-account": {
+                    "isPersonal": True,
+                    "accountCapabilities": {
+                        "urn:ietf:params:jmap:mail": {},
+                        "urn:ietf:params:jmap:submission": {},
+                        "urn:stalwart:jmap": {},
+                    },
+                }},
                 "username": "alice@example.com",
                 "apiUrl": f"{ORIGIN}/jmap/",
             })

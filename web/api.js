@@ -88,14 +88,16 @@ export async function loadAccount(origin, accessToken, fetcher = fetch) {
     }
     throw error;
   }
-  if (!session.capabilities?.[STALWART]) {
+  const accountID = session.primaryAccounts?.[STALWART];
+  const account = session.accounts?.[accountID];
+  // Stalwart advertises this extension on the account, not session.capabilities.
+  if (typeof accountID !== "string" || !account?.accountCapabilities?.[STALWART]) {
     throw new Error(
       "App-password setup is unavailable for this sign-in. "
       + "Ask your administrator to check this app's sign-in permissions.",
     );
   }
-  const accountID = session.primaryAccounts?.[STALWART];
-  if (typeof accountID !== "string" || !session.accounts?.[accountID]?.isPersonal) {
+  if (account.isPersonal !== true) {
     throw new Error("Stalwart did not return your personal account.");
   }
   const context = {
@@ -105,7 +107,7 @@ export async function loadAccount(origin, accessToken, fetcher = fetch) {
     email: emailAddress(session.username),
     name: "",
   };
-  if (session.capabilities[SUBMISSION] && session.capabilities[MAIL]) {
+  if (session.capabilities?.[SUBMISSION] && session.capabilities?.[MAIL]) {
     try {
       const identities = await jmapCall(context, "Identity/get",
         { accountId: accountID }, [CORE, SUBMISSION], fetcher);

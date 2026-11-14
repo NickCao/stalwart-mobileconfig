@@ -42,7 +42,7 @@ https://github.com/NickCao/stalwart-mobileconfig/releases/latest/download/stalwa
 ```
 
 Use that URL as `resourceUrl`, or replace `latest/download` with
-`download/v0.1.0` to select a specific release.
+`download/v0.1.3` to select a specific release.
 The application manager's resource URL points to the bundle; users
 visit the app served by Stalwart, such as `https://mail.example.com/apple-setup/`.
 An installation prefix other than `/apple-setup` works too.
@@ -115,11 +115,18 @@ Resource Indicators feature or configure an audience mapper. Keep audience
 validation enabled, and avoid posting access tokens in bug reports.
 
 If sign-in instead succeeds but the page says **App-password setup is
-unavailable for this sign-in**, check whether Keycloak issued the security
-scope. Stalwart filters `urn:stalwart:jmap` out of scope-limited JMAP sessions,
-so a missing capability does not necessarily mean the server lacks the API.
-Also check the granted mail and calendar scopes if credential creation is
-forbidden. After changing scope configuration, sign in again for a new token.
+unavailable for this sign-in**, use app version 0.1.3 or later. Versions through
+0.1.2 checked the wrong part of the JMAP session and could report this error
+despite sufficient scopes. Stalwart 1.1.0 advertises `urn:stalwart:jmap` in
+`primaryAccounts` and the selected account's `accountCapabilities`, without
+including it in the top-level `capabilities` object.
+
+If the selected personal account lacks that capability, check whether Keycloak
+issued the security scope. Stalwart filters account capabilities according to
+the token's granted scopes, so a missing capability does not necessarily mean
+the server lacks the API. Also check the granted mail and calendar scopes if
+credential creation is forbidden. After changing scope configuration, sign in
+again for a new token.
 
 ### What the user does
 
@@ -298,18 +305,34 @@ These checks simulate the Stalwart and Keycloak endpoints and download a real
 file in the browser. They cover desktop and mobile layouts, different
 installation prefixes, repeated downloads, a lost creation response, and expired
 sessions in Chromium and WebKit. They also check rejected initial sign-ins and
-scope-limited sessions, automatic setup scopes, and extra OAuth scopes
-injected by the application manager.
+scope-limited sessions, Stalwart's account-level capability advertisement,
+automatic setup scopes, and extra OAuth scopes injected by the application manager.
 The screenshots are written to `dist/`.
 
-Live Keycloak/Stalwart integration and installation of a browser-generated file
-still need to be verified against the actual deployment and on an Apple device.
-A downloaded file does not by itself confirm that Apple installed the profile.
+An additional integration check runs against a real Stalwart 1.1.0 executable:
+
+```sh
+uv run --no-project --with playwright python tests/stalwart_smoke.py --stalwart /path/to/stalwart
+```
+
+It provisions temporary SQLite state and test credentials, runs the hosted app
+in Chromium and WebKit, and verifies the actual CIMD document, JMAP session,
+app-password permission map, and generated profile. The generated password is
+used to authenticate over IMAP, SMTP, and CalDAV, and is rejected when trying
+to create another credential. The profile is compared with the Python
+generator using Stalwart's real PACC response. The check requires OpenSSL and
+the Playwright browser installations above. Server state is removed afterward.
+
+This check uses Stalwart's own OAuth provider. Keycloak integration was reviewed
+against upstream source, but the actual deployment's Keycloak configuration and
+Apple profile installation still need a live check. See the
+[integration audit](docs/integration-audit.md) for the reviewed contracts and limits.
 
 ## Releases
 
 GitHub Actions runs the Python and JavaScript tests, Chromium and WebKit browser
-checks, and the ZIP build on pushes to `master` and pull requests. The built ZIP
+checks with both fixtures and real Stalwart 1.1.0, and the ZIP build on pushes to
+`master` and pull requests. The built ZIP
 is available in the run's `stalwart-mobileconfig` artifact. The workflow can also
 be run manually from the Actions tab.
 
@@ -322,14 +345,15 @@ For a release of the current version:
 
 ```sh
 git push origin master
-git tag -a v0.1.2 -m "Release v0.1.2"
-git push origin v0.1.2
+git tag -a v0.1.3 -m "Release v0.1.3"
+git push origin v0.1.3
 ```
 
 For later releases, update `version` in `web/stalwart-app.json`, `package.json`,
-and `pyproject.toml`, and `software_version` in `web/oauth-client.json`. Commit
-those changes, then push the branch and a matching `vMAJOR.MINOR.PATCH` tag.
-The workflow refuses to publish if any of those versions differs from the tag.
+and `pyproject.toml`, and `software_version` in `web/oauth-client.json`, then
+refresh `uv.lock` with `uv lock`. Commit those changes, then push the branch and
+a matching `vMAJOR.MINOR.PATCH` tag. The workflow refuses to publish if any of
+those versions, including the project entry in `uv.lock`, differs from the tag.
 
 A rerun can finish an existing draft release. If the release is already
 published, it verifies that the attached ZIP matches the new build and leaves

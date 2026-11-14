@@ -54,6 +54,11 @@ jobs:
               "web/oauth-client.json": json.loads(Path("web/oauth-client.json").read_text())["software_version"],
               "package.json": json.loads(Path("package.json").read_text())["version"],
               "pyproject.toml": tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"],
+              "uv.lock": next(
+                  package["version"]
+                  for package in tomllib.loads(Path("uv.lock").read_text())["package"]
+                  if package["name"] == "stalwart-mobileconfig"
+              ),
           }
           for path, version in versions.items():
               if version != expected:
@@ -83,6 +88,17 @@ jobs:
         run: |
           python scripts/build_webapp.py
           python -m zipfile --test dist/stalwart-mobileconfig.zip
+
+      - name: Test against Stalwart 1.1.0
+        run: |
+          mkdir -p "$RUNNER_TEMP/stalwart-integration"
+          curl --fail --location --retry 3 \
+            https://github.com/stalwartlabs/stalwart/releases/download/v1.1.0/stalwart-x86_64-unknown-linux-musl.tar.gz \
+            --output "$RUNNER_TEMP/stalwart-integration/stalwart.tar.gz"
+          echo "e1d9538748730b103279542b91cd4d7723eb4106687a51a167c9507a48072aa8  $RUNNER_TEMP/stalwart-integration/stalwart.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/stalwart-integration/stalwart.tar.gz" \
+            -C "$RUNNER_TEMP/stalwart-integration" stalwart
+          python tests/stalwart_smoke.py --stalwart "$RUNNER_TEMP/stalwart-integration/stalwart"
 
       - name: Upload application bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

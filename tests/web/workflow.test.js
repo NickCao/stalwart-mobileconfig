@@ -21,20 +21,64 @@ function creationResponse() {
   ] });
 }
 
-test("session discovery binds the profile to the authenticated personal account", async () => {
+function accountSession() {
+  // Stalwart 1.1.0 advertises its extension on accounts, not session.capabilities.
+  return {
+    capabilities: { [CORE]: {} },
+    primaryAccounts: { [STALWART]: "own-account" },
+    accounts: {
+      "own-account": { isPersonal: true, accountCapabilities: { [STALWART]: {} } },
+      "shared-account": { isPersonal: false, accountCapabilities: { [STALWART]: {} } },
+    },
+    username: context.email,
+    apiUrl: context.apiURL,
+  };
+}
+
+test("session discovery uses the personal account capability without a top-level Stalwart capability", async () => {
   const result = await loadAccount("https://mail.example.com", "token", async (url, options) => {
     assert.equal(url, "https://mail.example.com/jmap/session");
     assert.equal(options.headers.Authorization, "Bearer token");
-    return Response.json({
-      capabilities: { [CORE]: {}, [STALWART]: {} },
-      primaryAccounts: { [STALWART]: "own-account" },
-      accounts: { "own-account": { isPersonal: true }, "shared-account": { isPersonal: false } },
-      username: "Alice@EXAMPLE.COM",
-      apiUrl: context.apiURL,
-    });
+    return Response.json({ ...accountSession(), username: "Alice@EXAMPLE.COM" });
   });
   assert.equal(result.accountID, "own-account");
   assert.equal(result.email, "Alice@example.com");
+});
+
+test("a top-level capability cannot substitute for the personal account capability", async () => {
+  for (const advertiseTopLevel of [false, true]) {
+    const session = accountSession();
+    session.accounts["own-account"].accountCapabilities = {};
+    if (advertiseTopLevel) session.capabilities[STALWART] = {};
+    let requests = 0;
+    await assert.rejects(loadAccount("https://mail.example.com", "token", async () => {
+      requests++;
+      return Response.json(session);
+    }), /App-password setup is unavailable for this sign-in/u);
+    assert.equal(requests, 1);
+  }
+});
+
+test("session discovery requires the primary account mapping instead of choosing another account", async () => {
+  const session = accountSession();
+  delete session.primaryAccounts[STALWART];
+  let requests = 0;
+  await assert.rejects(loadAccount("https://mail.example.com", "token", async () => {
+    requests++;
+    return Response.json(session);
+  }), /App-password setup is unavailable for this sign-in/u);
+  assert.equal(requests, 1);
+});
+
+test("session discovery rejects a shared account even when it advertises account management", async () => {
+  const session = accountSession();
+  session.primaryAccounts[STALWART] = "shared-account";
+  let requests = 0;
+  await assert.rejects(loadAccount("https://mail.example.com", "token", async () => {
+    requests++;
+    return Response.json(session);
+  }), /personal account/u);
+  assert.equal(requests, 1);
 });
 
 test("a rejected sign-in is distinguished from a later expired session", async () => {
@@ -59,7 +103,10 @@ test("a scope-limited session reports unavailable setup without claiming the ser
     return Response.json({
       capabilities: { [CORE]: {}, "urn:ietf:params:jmap:mail": {} },
       primaryAccounts: { "urn:ietf:params:jmap:mail": "own-account" },
-      accounts: { "own-account": { isPersonal: true } },
+      accounts: { "own-account": {
+        isPersonal: true,
+        accountCapabilities: { "urn:ietf:params:jmap:mail": {} },
+      } },
       username: context.email,
       apiUrl: context.apiURL,
     });
@@ -76,13 +123,7 @@ test("a foreign API URL never receives the bearer token", async () => {
   let requests = 0;
   await assert.rejects(loadAccount("https://mail.example.com", "token", async () => {
     requests++;
-    return Response.json({
-      capabilities: { [STALWART]: {} },
-      primaryAccounts: { [STALWART]: "own-account" },
-      accounts: { "own-account": { isPersonal: true } },
-      username: context.email,
-      apiUrl: "https://attacker.example/jmap",
-    });
+    return Response.json({ ...accountSession(), apiUrl: "https://attacker.example/jmap" });
   }), /this Stalwart server/u);
   assert.equal(requests, 1);
 });
