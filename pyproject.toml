@@ -1,6 +1,6 @@
 [project]
 name = "stalwart-mobileconfig"
-version = "0.1.1"
+version = "0.1.2"
 description = "Generate Apple Mail and CalDAV profiles from Stalwart autoconfiguration"
 readme = "README.md"
 license = "MIT"

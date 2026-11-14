@@ -4,6 +4,11 @@ import { clearSignIn, codeChallenge, finishSignIn, signInScopes, startSignIn } f
 
 const base = "https://mail.example.com/apple-setup/";
 const issuer = "https://id.example.com/realms/mail";
+const setupScopes = [
+  "urn:ietf:params:oauth:scope:mail",
+  "urn:ietf:params:oauth:scope:calendars",
+  "urn:stalwart:oauth:scope:security",
+];
 const metadata = {
   issuer,
   authorization_endpoint: `${issuer}/protocol/openid-connect/auth`,
@@ -53,7 +58,7 @@ test("sign-in discovers Keycloak, uses the installed CIMD URL, and allows existi
   assert.equal(url.origin, "https://id.example.com");
   assert.equal(url.searchParams.get("client_id"), `${base}oauth-client.json`);
   assert.equal(url.searchParams.get("redirect_uri"), `${base}index.html`);
-  assert.equal(url.searchParams.get("scope"), "openid profile email");
+  assert.equal(url.searchParams.get("scope"), ["openid", "profile", "email", ...setupScopes].join(" "));
   assert.equal(url.searchParams.get("resource"), "https://mail.example.com");
   assert.equal(url.searchParams.get("code_challenge_method"), "S256");
   assert.equal(url.searchParams.has("prompt"), false);
@@ -62,16 +67,21 @@ test("sign-in discovers Keycloak, uses the installed CIMD URL, and allows existi
   assert.equal(stored.verifier.length, 43);
 });
 
-test("identity claims, required scopes, and administrator-configured audience scopes are requested together", async () => {
+test("setup scopes are requested without application configuration or an advertised scope list", () => {
+  assert.deepEqual(signInScopes({}), ["openid", "profile", "email", ...setupScopes]);
+  assert.deepEqual(signInScopes({ scopes_supported: ["openid"] }), ["openid", ...setupScopes]);
+  assert.equal(signInScopes(metadata).some((scope) => /:scope:(full|settings)$/u.test(scope)), false);
+});
+
+test("setup scopes, identity claims, and administrator-configured audience scopes are combined without duplicates", async () => {
   const storage = new Storage();
   const url = new URL(await startSignIn(base, storage,
     discovery({ stalwart_required_scopes: ["openid", "profile", "groups", null] }),
-    ["stalwart", "profile"]));
-  assert.equal(url.searchParams.get("scope"), "openid profile email groups stalwart");
+    ["stalwart", "profile", setupScopes[2]]));
+  const expected = ["openid", "profile", "email", ...setupScopes, "groups", "stalwart"];
+  assert.equal(url.searchParams.get("scope"), expected.join(" "));
   const stored = JSON.parse([...storage.values.values()][0]);
-  assert.deepEqual(stored.scopes, ["openid", "profile", "email", "groups", "stalwart"]);
-  assert.deepEqual(signInScopes({ scopes_supported: ["openid"] }), ["openid"]);
-  assert.deepEqual(signInScopes({}), ["openid", "profile", "email"]);
+  assert.deepEqual(stored.scopes, expected);
 });
 
 test("callback exchanges a code once and stores no access or refresh token", async () => {

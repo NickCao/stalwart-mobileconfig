@@ -18,8 +18,8 @@ python3 scripts/build_webapp.py
 ```
 
 This writes `dist/stalwart-mobileconfig.zip`. Its manifest targets Stalwart
-1.0.0 or later with native application hosting and the `x:AppPassword/set`
-JMAP extension.
+1.1.0 or later with native application hosting, the `x:AppPassword/set`
+JMAP extension, and the OAuth security scope for credential management.
 
 Place the ZIP on the Stalwart server, for example at
 `/opt/stalwart/stalwart-mobileconfig.zip`, and configure an Application object:
@@ -68,6 +68,21 @@ The app requests `openid`, `profile`, and `email` when the issuer advertises
 them. The latter two scopes let Keycloak include the username, display name,
 and email claims that Stalwart may need to resolve the mailbox.
 
+The app also requests these three scopes automatically, with no
+`oauthScopes` configuration needed on the Stalwart Application:
+
+- `urn:ietf:params:oauth:scope:mail`
+- `urn:ietf:params:oauth:scope:calendars`
+- `urn:stalwart:oauth:scope:security`
+
+Security permits app-password creation. Mail and calendars permit assigning
+the matching protocol permissions to the new credential. Keycloak must allow
+these client scopes for the CIMD client and include the granted names in the
+access token's `scope` claim. Advertising them in discovery alone does not
+grant them. The app requests all three even when they are not advertised,
+because each is required for setup. It does not request the broader `full`
+scope or the unrelated `settings` scope.
+
 The requested resource is the Stalwart origin. Stalwart must accept the
 Keycloak access token's issuer and audience, as for its other first-party clients.
 With Keycloak's Resource Indicators feature enabled, add that origin to the
@@ -87,7 +102,7 @@ a client scope named `stalwart` that you have already configured in Keycloak:
 ```
 
 Stalwart injects these extra scopes into the app's `oauth-scopes` meta tag;
-the app includes them alongside the identity scopes at sign-in.
+the app includes them alongside its built-in setup and identity scopes at sign-in.
 The Keycloak token endpoint must permit browser requests from the Stalwart
 origin; enabling CIMD alone does not replace the realm's trust and CORS policy.
 
@@ -98,6 +113,13 @@ audience, an issuer/signature error, or an unrecognized client can all prevent
 authentication. Requesting `resource` does not by itself enable Keycloak's
 Resource Indicators feature or configure an audience mapper. Keep audience
 validation enabled, and avoid posting access tokens in bug reports.
+
+If sign-in instead succeeds but the page says **App-password setup is
+unavailable for this sign-in**, check whether Keycloak issued the security
+scope. Stalwart filters `urn:stalwart:jmap` out of scope-limited JMAP sessions,
+so a missing capability does not necessarily mean the server lacks the API.
+Also check the granted mail and calendar scopes if credential creation is
+forbidden. After changing scope configuration, sign in again for a new token.
 
 ### What the user does
 
@@ -276,7 +298,8 @@ These checks simulate the Stalwart and Keycloak endpoints and download a real
 file in the browser. They cover desktop and mobile layouts, different
 installation prefixes, repeated downloads, a lost creation response, and expired
 sessions in Chromium and WebKit. They also check rejected initial sign-ins and
-extra OAuth scopes injected by the application manager.
+scope-limited sessions, automatic setup scopes, and extra OAuth scopes
+injected by the application manager.
 The screenshots are written to `dist/`.
 
 Live Keycloak/Stalwart integration and installation of a browser-generated file
@@ -299,8 +322,8 @@ For a release of the current version:
 
 ```sh
 git push origin master
-git tag -a v0.1.1 -m "Release v0.1.1"
-git push origin v0.1.1
+git tag -a v0.1.2 -m "Release v0.1.2"
+git push origin v0.1.2
 ```
 
 For later releases, update `version` in `web/stalwart-app.json`, `package.json`,

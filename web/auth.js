@@ -3,6 +3,13 @@ import { httpsURL } from "./profile.js";
 
 const TRANSACTION_KEY = "stalwart-mobileconfig.oauth";
 const MAX_TRANSACTION_AGE = 10 * 60 * 1000;
+// Creating the credential needs security; granting its protocol permissions
+// also needs mail and calendars, even though the app does not read that data.
+const SETUP_SCOPES = [
+  "urn:ietf:params:oauth:scope:mail",
+  "urn:ietf:params:oauth:scope:calendars",
+  "urn:stalwart:oauth:scope:security",
+];
 
 function randomToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -31,7 +38,7 @@ export function signInScopes(metadata, extraScopes = []) {
     !Array.isArray(metadata.scopes_supported) || metadata.scopes_supported.includes(scope));
   const requiredScopes = Array.isArray(metadata.stalwart_required_scopes)
     ? metadata.stalwart_required_scopes : [];
-  return [...new Set([...identityScopes, ...requiredScopes, ...extraScopes]
+  return [...new Set([...identityScopes, ...SETUP_SCOPES, ...requiredScopes, ...extraScopes]
     .filter((scope) => typeof scope === "string" && scope))];
 }
 

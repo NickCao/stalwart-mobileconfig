@@ -51,6 +51,27 @@ test("a rejected sign-in is distinguished from a later expired session", async (
   });
 });
 
+test("a scope-limited session reports unavailable setup without claiming the server lacks the API", async () => {
+  let requests = 0;
+  await assert.rejects(loadAccount("https://mail.example.com", "limited-token", async (url) => {
+    requests++;
+    assert.equal(url, "https://mail.example.com/jmap/session");
+    return Response.json({
+      capabilities: { [CORE]: {}, "urn:ietf:params:jmap:mail": {} },
+      primaryAccounts: { "urn:ietf:params:jmap:mail": "own-account" },
+      accounts: { "own-account": { isPersonal: true } },
+      username: context.email,
+      apiUrl: context.apiURL,
+    });
+  }), (error) => {
+    assert.match(error.message, /App-password setup is unavailable for this sign-in/u);
+    assert.match(error.message, /sign-in permissions/u);
+    assert.doesNotMatch(error.message, /server does not expose|expired/u);
+    return true;
+  });
+  assert.equal(requests, 1);
+});
+
 test("a foreign API URL never receives the bearer token", async () => {
   let requests = 0;
   await assert.rejects(loadAccount("https://mail.example.com", "token", async () => {

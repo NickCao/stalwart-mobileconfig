@@ -89,7 +89,10 @@ export async function loadAccount(origin, accessToken, fetcher = fetch) {
     throw error;
   }
   if (!session.capabilities?.[STALWART]) {
-    throw new Error("This server does not expose Stalwart's account-management API.");
+    throw new Error(
+      "App-password setup is unavailable for this sign-in. "
+      + "Ask your administrator to check this app's sign-in permissions.",
+    );
   }
   const accountID = session.primaryAccounts?.[STALWART];
   if (typeof accountID !== "string" || !session.accounts?.[accountID]?.isPersonal) {
