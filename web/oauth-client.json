@@ -1,0 +1,12 @@
+{
+  "client_name": "Mail & Calendar Setup",
+  "client_uri": "index.html",
+  "logo_uri": "icon.svg",
+  "redirect_uris": ["index.html"],
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "openid",
+  "software_id": "io.github.nickcao.stalwart-mobileconfig",
+  "software_version": "0.1.0"
+}
