@@ -121,7 +121,9 @@ export function discoverConfiguration(origin, fetcher = fetch) {
   return fetchJSON(`${origin}/.well-known/user-agent-configuration.json`, {}, fetcher);
 }
 
+// Audited 2026-11-14 against Stalwart v1.1.0 (e7cde9b); see README for scope.
 // These protocol permissions deliberately exclude JMAP and account administration.
+// Common DAV REPORT permissions apply across calendars, contacts, and files.
 // CredentialPermissions is Stalwart's tagged Replace object, not an OAuth scope.
 export const DEVICE_PERMISSIONS = [
   "authenticate", "emailSend", "calendarSchedulingSend", "calendarSchedulingReceive",

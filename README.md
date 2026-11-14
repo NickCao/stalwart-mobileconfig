@@ -118,6 +118,41 @@ IMAP, SMTP submission, and CalDAV. It does not inherit account-administration
 permissions. The account must be allowed to grant those protocol permissions.
 No password is created merely by opening the page or signing in.
 
+The 55 permissions in [`DEVICE_PERMISSIONS`](web/api.js) were audited on
+November 14, 2026 against Stalwart **v1.1.0**, commit
+`e7cde9b3fac32d2a254ef782efec56f2373ec5d4` (also the current `main`).
+All names are valid in v1.0.0 as well; no additions or renames were needed.
+
+| Group | Requested permissions | Count |
+| --- | --- | ---: |
+| Authentication | `authenticate` | 1 |
+| SMTP submission | `emailSend` | 1 |
+| Calendar scheduling | `calendarSchedulingSend`, `calendarSchedulingReceive` | 2 |
+| IMAP | All `imap*` permissions | 31 |
+| CalDAV | All `davCal*` permissions | 13 |
+| Shared DAV reports and principal discovery | `davSyncCollection`, `davExpandProperty`, `davPrincipalAcl`, `davPrincipalList`, `davPrincipalMatch`, `davPrincipalSearch`, `davPrincipalSearchPropSet` | 7 |
+
+The request uses `CredentialPermissions.Replace`; Stalwart intersects the
+credential's permissions with the account's effective permissions. The list
+includes mailbox and calendar sharing changes (`imapAclSet`, `davCalAcl`).
+`davPrincipalAcl` permits the read-only `acl-principal-prop-set` report.
+
+Contact-specific (`davCard*`) and file-specific (`davFile*`) permissions are
+omitted. However, Stalwart dispatches `davSyncCollection` and
+`davExpandProperty` reports across calendar, contact, and file collections.
+This list therefore should not be treated as a hard calendar-only DAV boundary.
+That conclusion comes from source inspection, without a live cross-service
+access test. The list aims for protocol compatibility rather than the minimum
+possible set: for example, `calendarSchedulingReceive` is valid, but inbound
+invitation processing checks it on the recipient account rather than the
+device credential.
+
+The audit checked the upstream
+[permission parser](https://github.com/stalwartlabs/stalwart/blob/e7cde9b3fac32d2a254ef782efec56f2373ec5d4/crates/registry/src/schema/enums_impl.rs),
+[credential permission enforcement](https://github.com/stalwartlabs/stalwart/blob/e7cde9b3fac32d2a254ef782efec56f2373ec5d4/crates/common/src/auth/access_token.rs),
+and IMAP, SMTP, calendar scheduling, and
+[DAV request handlers](https://github.com/stalwartlabs/stalwart/blob/e7cde9b3fac32d2a254ef782efec56f2373ec5d4/crates/dav/src/request.rs).
+
 **Download again** reuses the same file and password while the tab stays open.
 If the creation response is lost, the app blocks another creation attempt
 and asks the user to check their app passwords in Stalwart first.
