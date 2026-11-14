@@ -1,0 +1,129 @@
+name: Build and release
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
+              raise SystemExit("Release tags must use vMAJOR.MINOR.PATCH.")
+          expected = tag[1:]
+          versions = {
+              "web/stalwart-app.json": json.loads(Path("web/stalwart-app.json").read_text())["version"],
+              "web/oauth-client.json": json.loads(Path("web/oauth-client.json").read_text())["software_version"],
+              "package.json": json.loads(Path("package.json").read_text())["version"],
+              "pyproject.toml": tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"],
+          }
+          for path, version in versions.items():
+              if version != expected:
+                  raise SystemExit(f"{path}: version {version!r} does not match {tag!r}")
+          print(f"All package versions match {tag}")
+          PY
+
+      - name: Test Python CLI
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+
+      - name: Test webapp
+        run: npm test
+
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.65.2
+          python -m playwright install --with-deps chromium webkit
+
+      - name: Test Chromium and WebKit
+        run: |
+          python tests/browser_smoke.py
+          python tests/browser_smoke.py --browser webkit
+
+      - name: Build Stalwart application
+        run: |
+          python scripts/build_webapp.py
+          python -m zipfile --test dist/stalwart-mobileconfig.zip
+
+      - name: Upload application bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stalwart-mobileconfig
+          path: dist/stalwart-mobileconfig.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested application bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: stalwart-mobileconfig
+          path: dist
+
+      - name: Publish application bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            if [[ "$is_draft" == "true" ]]; then
+              gh release upload "$RELEASE_TAG" dist/stalwart-mobileconfig.zip --clobber
+              gh release edit "$RELEASE_TAG" --draft=false
+            else
+              gh release download "$RELEASE_TAG" \
+                --pattern stalwart-mobileconfig.zip --dir existing-release
+              cmp dist/stalwart-mobileconfig.zip existing-release/stalwart-mobileconfig.zip
+              echo "Release already published with this bundle."
+            fi
+          else
+            gh release create "$RELEASE_TAG" dist/stalwart-mobileconfig.zip \
+              --verify-tag --title "$RELEASE_TAG" --generate-notes
+          fi

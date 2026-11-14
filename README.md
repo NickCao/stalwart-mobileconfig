@@ -34,7 +34,16 @@ Place the ZIP on the Stalwart server, for example at
 ```
 
 Alternatively, set `resourceUrl` to an HTTPS URL from which Stalwart can download
-the ZIP. The application manager's resource URL points to the bundle; users
+the ZIP. Once a GitHub release has been published, the latest release's bundle
+is available at this URL:
+
+```text
+https://github.com/NickCao/stalwart-mobileconfig/releases/latest/download/stalwart-mobileconfig.zip
+```
+
+Use that URL as `resourceUrl`, or replace `latest/download` with
+`download/v0.1.0` to select a specific release.
+The application manager's resource URL points to the bundle; users
 visit the app served by Stalwart, such as `https://mail.example.com/apple-setup/`.
 An installation prefix other than `/apple-setup` works too.
 
@@ -207,6 +216,35 @@ The screenshots are written to `dist/`.
 Live Keycloak/Stalwart integration and installation of a browser-generated file
 still need to be verified against the actual deployment and on an Apple device.
 A downloaded file does not by itself confirm that Apple installed the profile.
+
+## Releases
+
+GitHub Actions runs the Python and JavaScript tests, Chromium and WebKit browser
+checks, and the ZIP build on pushes to `master` and pull requests. The built ZIP
+is available in the run's `stalwart-mobileconfig` artifact. The workflow can also
+be run manually from the Actions tab.
+
+Pushing a version tag such as `v0.1.0` runs the same checks and publishes a GitHub
+release with generated release notes and `stalwart-mobileconfig.zip` attached.
+Publishing uses GitHub's built-in `GITHUB_TOKEN`; no personal access token or
+repository secret is needed.
+
+For the first release, after committing the workflow:
+
+```sh
+git push origin master
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+For later releases, update `version` in `web/stalwart-app.json`, `package.json`,
+and `pyproject.toml`, and `software_version` in `web/oauth-client.json`. Commit
+those changes, then push the branch and a matching `vMAJOR.MINOR.PATCH` tag.
+The workflow refuses to publish if any of those versions differs from the tag.
+
+A rerun can finish an existing draft release. If the release is already
+published, it verifies that the attached ZIP matches the new build and leaves
+the release intact. Changed bundles require a new version and tag.
 
 ## References
 
